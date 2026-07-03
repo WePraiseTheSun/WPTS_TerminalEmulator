@@ -13,6 +13,7 @@ namespace TerminalEmulator.Control.Sessions
     {
         private readonly Dictionary<string, TerminalSession> _sessions =
             new Dictionary<string, TerminalSession>(StringComparer.Ordinal);
+        private readonly List<string> _order = new List<string>(); // stable tab order
         private readonly object _sync = new object();
         private string _activeSessionId;
         private bool _disposed;
@@ -41,9 +42,16 @@ namespace TerminalEmulator.Control.Sessions
             }
         }
 
+        /// <summary>Live sessions in stable tab (creation) order.</summary>
         public IReadOnlyList<TerminalSession> Sessions
         {
-            get { lock (_sync) { return _sessions.Values.ToList(); } }
+            get
+            {
+                lock (_sync)
+                {
+                    return _order.Select(id => _sessions[id]).ToList();
+                }
+            }
         }
 
         public TerminalSession GetSession(string id)
@@ -74,6 +82,7 @@ namespace TerminalEmulator.Control.Sessions
                     throw new ObjectDisposedException(nameof(SessionManager));
                 }
                 _sessions[session.Id] = session;
+                _order.Add(session.Id);
             }
 
             return session;
@@ -119,9 +128,18 @@ namespace TerminalEmulator.Control.Sessions
             {
                 if (!_sessions.TryGetValue(sessionId, out session)) return _activeSessionId;
 
+                int index = _order.IndexOf(sessionId);
                 _sessions.Remove(sessionId);
+                if (index >= 0) _order.RemoveAt(index);
                 if (_activeSessionId == sessionId) _activeSessionId = null;
-                nextActive = _activeSessionId ?? _sessions.Keys.FirstOrDefault();
+
+                // Prefer the closed tab's right neighbor, then the last tab.
+                string neighbor = null;
+                if (_order.Count > 0)
+                {
+                    neighbor = index >= 0 && index < _order.Count ? _order[index] : _order[_order.Count - 1];
+                }
+                nextActive = _activeSessionId ?? neighbor;
             }
 
             session.Output -= OnSessionOutput;
@@ -152,6 +170,7 @@ namespace TerminalEmulator.Control.Sessions
                 _disposed = true;
                 sessions = _sessions.Values.ToList();
                 _sessions.Clear();
+                _order.Clear();
                 _activeSessionId = null;
             }
 

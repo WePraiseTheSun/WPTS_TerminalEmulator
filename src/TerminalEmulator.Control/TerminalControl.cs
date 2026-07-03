@@ -82,6 +82,12 @@ namespace TerminalEmulator.Control
             get { return _sessions.ActiveSessionId; }
         }
 
+        /// <summary>All live sessions in creation order (for workspace save/restore, diagnostics).</summary>
+        public IReadOnlyList<TerminalSession> Sessions
+        {
+            get { return _sessions.Sessions; }
+        }
+
         public TerminalControl()
         {
             SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
@@ -542,7 +548,9 @@ namespace TerminalEmulator.Control
             var session = _sessions.GetSession(sessionId) ?? _sessions.ActiveSession;
             if (session == null) return;
 
-            string baseDirectory = session.Profile.StartDirectory;
+            // Live CWD (falls back to the profile's start directory), so
+            // completion follows the user as they cd around.
+            string baseDirectory = session.GetWorkingDirectory();
             string capturedSessionId = session.Id;
 
             Task.Run(() =>

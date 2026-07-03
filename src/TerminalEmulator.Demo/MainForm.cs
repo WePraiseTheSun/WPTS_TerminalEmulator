@@ -63,6 +63,12 @@ namespace TerminalEmulator.Demo
         {
             var menu = new MenuStrip();
 
+            var fileMenu = new ToolStripMenuItem("&File");
+            fileMenu.DropDownItems.Add("&Save Workspace…", null, (s, e) => SaveWorkspace());
+            fileMenu.DropDownItems.Add("&Open Workspace…", null, (s, e) => OpenWorkspace());
+            fileMenu.DropDownItems.Add(new ToolStripSeparator());
+            fileMenu.DropDownItems.Add("E&xit", null, (s, e) => Close());
+
             var shellMenu = new ToolStripMenuItem("&Shell");
             shellMenu.DropDownItems.Add("New &Command Prompt", null,
                 (s, e) => SafeCreate(ShellProfile.Cmd()));
@@ -91,9 +97,97 @@ namespace TerminalEmulator.Demo
                     (s, e) => _terminal.ApplyTheme(ThemeManager.Get(captured)));
             }
 
+            menu.Items.Add(fileMenu);
             menu.Items.Add(shellMenu);
             menu.Items.Add(viewMenu);
             return menu;
+        }
+
+        // ---------------------------------------------------------------
+        // Workspace save / restore
+        // ---------------------------------------------------------------
+
+        private const string WorkspaceFilter = "Terminal workspace (*.terminal.json)|*.terminal.json|JSON files (*.json)|*.json|All files (*.*)|*.*";
+
+        private void SaveWorkspace()
+        {
+            var workspace = TerminalWorkspace.Capture(_terminal);
+            if (workspace.Tabs.Count == 0)
+            {
+                MessageBox.Show(this, "There are no open tabs to save.", "Save Workspace",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (var dialog = new SaveFileDialog
+            {
+                Title = "Save Workspace",
+                Filter = WorkspaceFilter,
+                DefaultExt = "terminal.json",
+                FileName = "workspace.terminal.json",
+                AddExtension = true
+            })
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK) return;
+
+                try
+                {
+                    workspace.Save(dialog.FileName);
+                    _status.Text = "Saved " + workspace.Tabs.Count + " tab(s) to " +
+                                   System.IO.Path.GetFileName(dialog.FileName) + ".";
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, ex.Message, "Failed to save workspace",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+        }
+
+        private void OpenWorkspace()
+        {
+            using (var dialog = new OpenFileDialog
+            {
+                Title = "Open Workspace",
+                Filter = WorkspaceFilter,
+                CheckFileExists = true
+            })
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK) return;
+
+                TerminalWorkspace workspace;
+                try
+                {
+                    workspace = TerminalWorkspace.Load(dialog.FileName);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, ex.Message, "Failed to open workspace",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (workspace.Tabs.Count > 0 && _terminal.Sessions.Count > 0)
+                {
+                    var answer = MessageBox.Show(this,
+                        "Restoring this workspace will close the " + _terminal.Sessions.Count +
+                        " currently open tab(s) and open " + workspace.Tabs.Count +
+                        " saved tab(s). Continue?",
+                        "Open Workspace", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (answer != DialogResult.Yes) return;
+                }
+
+                var warnings = workspace.ApplyTo(_terminal);
+                _status.Text = "Restored " + workspace.Tabs.Count + " tab(s) from " +
+                               System.IO.Path.GetFileName(dialog.FileName) + ".";
+
+                if (warnings.Count > 0)
+                {
+                    MessageBox.Show(this, string.Join(Environment.NewLine, warnings),
+                        "Workspace restored with warnings",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
         }
 
         private void SafeCreate(ShellProfile profile)

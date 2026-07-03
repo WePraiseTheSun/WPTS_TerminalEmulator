@@ -42,6 +42,33 @@ namespace TerminalEmulator.Control.Sessions
             }
         }
 
+        /// <summary>Process id of the root shell process (0 when not running).</summary>
+        public int ProcessId
+        {
+            get
+            {
+                var process = _process;
+                return process != null ? process.ProcessId : 0;
+            }
+        }
+
+        /// <summary>
+        /// Best-effort live working directory of the shell, read from the
+        /// child process (accurate for cmd; PowerShell reports its launch
+        /// directory because it tracks location without changing the process
+        /// CWD). Falls back to the profile's start directory.
+        /// </summary>
+        public string GetWorkingDirectory()
+        {
+            var process = _process;
+            if (process != null && !process.HasExited)
+            {
+                string cwd = ProcessWorkingDirectory.TryGet(process.ProcessId);
+                if (!string.IsNullOrEmpty(cwd)) return cwd;
+            }
+            return Profile.StartDirectory;
+        }
+
         /// <summary>Decoded output ready for the renderer. Raised on thread-pool threads.</summary>
         public event Action<TerminalSession, string> Output;
 
