@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+  <title>Terminal</title>
+  <link rel="stylesheet" href="lib/xterm.css" />
+  <link rel="stylesheet" href="terminal.css" />
+</head>
+<body>
+  <div id="chrome">
+    <div id="tabs" role="tablist"></div>
+    <div id="actions">
+      <button class="action" data-shell="cmd" title="New Command Prompt tab">+ cmd</button>
+      <button class="action" data-shell="powershell" title="New PowerShell tab">+ ps</button>
+    </div>
+  </div>
+
+  <div id="terminal-container">
+    <div id="terminal"></div>
+    <div id="completion-popup" hidden>
+      <ul id="completion-list"></ul>
+      <div id="completion-hint">↑↓ navigate · Tab/Enter insert · Esc close</div>
+    </div>
+  </div>
+
+  <script src="lib/xterm.js"></script>
+  <script src="lib/addon-fit.js"></script>
+  <script src="lib/addon-web-links.js"></script>
+  <script src="terminal.js"></script>
+</body>
+</html>
