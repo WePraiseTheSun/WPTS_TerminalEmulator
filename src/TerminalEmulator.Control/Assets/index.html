@@ -14,11 +14,13 @@
     <div id="actions">
       <button class="action" data-shell="cmd" title="New Command Prompt tab">+ cmd</button>
       <button class="action" data-shell="powershell" title="New PowerShell tab">+ ps</button>
+      <button class="action" data-shell="wsl" title="New WSL tab (default distro)">+ wsl</button>
     </div>
   </div>
 
   <div id="terminal-container">
     <div id="terminal"></div>
+    <div id="context-menu" role="menu"></div>
     <div id="completion-popup" hidden>
       <ul id="completion-list"></ul>
       <div id="completion-hint">↑↓ navigate · Tab/Enter insert · Esc close</div>

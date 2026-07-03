@@ -87,11 +87,36 @@
     }
   }
 
+  function pasteText(text) {
+    if (text && state.activeSessionId) {
+      send({ type: "paste", sessionId: state.activeSessionId, text: text });
+    }
+  }
+
+  // Used by the context menu, where no native paste event is available.
   function pasteFromClipboard() {
     if (!navigator.clipboard || !state.activeSessionId) return;
-    navigator.clipboard.readText().then(function (text) {
-      if (text) send({ type: "paste", sessionId: state.activeSessionId, text: text });
-    }).catch(function () { /* permission denied */ });
+    navigator.clipboard.readText().then(pasteText).catch(function () { /* permission denied */ });
+  }
+
+  // Single paste path. Ctrl+V / Shift+Insert trigger the browser's native
+  // paste; we intercept it in the capture phase (before xterm's own textarea
+  // listener runs) and route the text through the bridge to PTY stdin.
+  // Routing on the paste event instead of reading the clipboard from the
+  // keydown handler prevents the text being delivered twice (once via our
+  // bridge, once via xterm's default paste -> onData).
+  container.addEventListener("paste", function (ev) {
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    var text = ev.clipboardData ? ev.clipboardData.getData("text/plain") : "";
+    pasteText(text);
+  }, true);
+
+  function clearScreen() {
+    term.clear();
+    if (state.activeSessionId) {
+      send({ type: "clearScreen", sessionId: state.activeSessionId });
+    }
   }
 
   term.attachCustomKeyEventHandler(function (ev) {
@@ -117,9 +142,17 @@
       return false;
     }
 
-    // Ctrl+V (and Ctrl+Shift+V): paste routed through the bridge to PTY stdin.
+    // Ctrl+V (and Ctrl+Shift+V): block xterm's keydown handling but allow the
+    // browser default so exactly one native paste event fires; the capture
+    // listener above routes it through the bridge.
     if (ev.ctrlKey && (ev.key === "v" || ev.key === "V")) {
-      pasteFromClipboard();
+      return false;
+    }
+
+    // Ctrl+L: clear the screen (keeps the current prompt line), shell-agnostic.
+    if (ev.ctrlKey && !ev.shiftKey && !ev.altKey && (ev.key === "l" || ev.key === "L")) {
+      ev.preventDefault();
+      clearScreen();
       return false;
     }
 
@@ -131,6 +164,109 @@
 
     return true;
   });
+
+  // -------------------------------------------------------------------------
+  // Context menu (Cut / Copy / Paste / Delete / Select All)
+  // -------------------------------------------------------------------------
+
+  var contextMenu = (function () {
+    var element = document.getElementById("context-menu");
+
+    function buildItems() {
+      var hasSelection = term.hasSelection();
+      return [
+        {
+          label: "Cut", enabled: hasSelection,
+          run: function () { copySelection(); term.clearSelection(); }
+        },
+        {
+          label: "Copy", enabled: hasSelection,
+          run: function () { copySelection(); }
+        },
+        {
+          label: "Paste", enabled: !!state.activeSessionId,
+          run: function () { pasteFromClipboard(); }
+        },
+        {
+          label: "Delete", enabled: !!state.activeSessionId,
+          // Terminals cannot remove already-rendered output; Delete forwards
+          // the Delete key (deletes the character at the shell's cursor).
+          run: function () {
+            term.clearSelection();
+            send({ type: "input", sessionId: state.activeSessionId, payload: "\u001b[3~" });
+          }
+        },
+        { separator: true },
+        {
+          label: "Select All", enabled: true,
+          run: function () { term.selectAll(); }
+        }
+      ];
+    }
+
+    function open(x, y) {
+      element.textContent = "";
+
+      buildItems().forEach(function (item) {
+        if (item.separator) {
+          var hr = document.createElement("div");
+          hr.className = "separator";
+          element.appendChild(hr);
+          return;
+        }
+
+        var entry = document.createElement("div");
+        entry.className = "item" + (item.enabled ? "" : " disabled");
+        entry.textContent = item.label;
+        if (item.enabled) {
+          entry.addEventListener("mousedown", function (ev) {
+            // mousedown (not click): act before the terminal steals focus
+            // and clears the selection.
+            ev.preventDefault();
+            ev.stopPropagation();
+            close();
+            item.run();
+            term.focus();
+          });
+        }
+        element.appendChild(entry);
+      });
+
+      element.style.display = "block";
+
+      // Clamp inside the viewport.
+      var rect = element.getBoundingClientRect();
+      var left = Math.min(x, window.innerWidth - rect.width - 4);
+      var top = Math.min(y, window.innerHeight - rect.height - 4);
+      element.style.left = Math.max(0, left) + "px";
+      element.style.top = Math.max(0, top) + "px";
+    }
+
+    function close() {
+      element.style.display = "none";
+    }
+
+    function isOpen() {
+      return element.style.display === "block";
+    }
+
+    return { open: open, close: close, isOpen: isOpen };
+  })();
+
+  container.addEventListener("contextmenu", function (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    contextMenu.open(ev.clientX, ev.clientY);
+  });
+
+  document.addEventListener("mousedown", function (ev) {
+    if (contextMenu.isOpen() && !ev.target.closest("#context-menu")) contextMenu.close();
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") contextMenu.close();
+  }, true);
+  window.addEventListener("blur", function () { contextMenu.close(); });
+  window.addEventListener("resize", function () { contextMenu.close(); });
 
   // -------------------------------------------------------------------------
   // Resize handling (debounced fit -> resize message)

@@ -234,6 +234,22 @@ namespace TerminalEmulator.Control
             core.PermissionRequested += OnPermissionRequested;
             core.WebMessageReceived += OnWebMessageReceived;
 
+            // Drag & drop of files: Chromium cannot expose full local paths to
+            // JavaScript, so drops are handled at the WinForms layer instead.
+            // Disabling the browser's own drop target makes the OLE drop bubble
+            // up the HWND chain to the WebView2 control, where standard
+            // WinForms drag-drop events fire with real file system paths.
+            try
+            {
+                _webView.AllowExternalDrop = false;
+            }
+            catch (InvalidOperationException) { }
+            catch (NotSupportedException) { }
+
+            _webView.AllowExternalDrop = true;
+            _webView.DragEnter += OnTerminalDragEnter;
+            _webView.DragDrop += OnTerminalDragDrop;
+
             core.Navigate(StartPage);
         }
 
@@ -329,6 +345,11 @@ namespace TerminalEmulator.Control
                     var theme = ThemeManager.Get((string)message["name"]);
                     if (theme != null) ApplyTheme(theme);
                     break;
+
+                case BridgeProtocol.ClearScreen:
+                    var cleared = _sessions.GetSession((string)message["sessionId"]) ?? _sessions.ActiveSession;
+                    if (cleared != null) cleared.ClearReplay();
+                    break;
             }
         }
 
@@ -389,6 +410,81 @@ namespace TerminalEmulator.Control
         {
             var session = _sessions.GetSession(sessionId);
             if (session != null) session.AcknowledgeRendered(chars);
+        }
+
+        // -------------------------------------------------------------------
+        // Drag & drop: dropped files paste their (quoted) paths into the
+        // active shell; dropped text pastes as text.
+        // -------------------------------------------------------------------
+
+        private void OnTerminalDragEnter(object sender, DragEventArgs e)
+        {
+            bool acceptable = e.Data.GetDataPresent(DataFormats.FileDrop) ||
+                              e.Data.GetDataPresent(DataFormats.UnicodeText) ||
+                              e.Data.GetDataPresent(DataFormats.Text);
+            e.Effect = acceptable ? DragDropEffects.Copy : DragDropEffects.None;
+        }
+
+        private void OnTerminalDragDrop(object sender, DragEventArgs e)
+        {
+            var session = _sessions.ActiveSession;
+            if (session == null) return;
+
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                var paths = e.Data.GetData(DataFormats.FileDrop) as string[];
+                if (paths != null && paths.Length > 0)
+                {
+                    session.WriteInput(BuildDroppedPathText(paths, session.Profile.Kind));
+                }
+            }
+            else if (e.Data.GetDataPresent(DataFormats.UnicodeText))
+            {
+                session.Paste(e.Data.GetData(DataFormats.UnicodeText) as string);
+            }
+            else if (e.Data.GetDataPresent(DataFormats.Text))
+            {
+                session.Paste(e.Data.GetData(DataFormats.Text) as string);
+            }
+        }
+
+        internal static string BuildDroppedPathText(string[] paths, string shellKind)
+        {
+            bool isWsl = string.Equals(shellKind, "wsl", StringComparison.OrdinalIgnoreCase);
+
+            var parts = new List<string>(paths.Length);
+            foreach (var path in paths)
+            {
+                if (string.IsNullOrEmpty(path)) continue;
+                string value = isWsl ? ToWslPath(path) : path;
+                parts.Add(QuoteIfNeeded(value));
+            }
+            return string.Join(" ", parts);
+        }
+
+        private static string QuoteIfNeeded(string path)
+        {
+            bool needsQuotes = false;
+            foreach (var c in path)
+            {
+                if (c == ' ' || c == '\t' || c == '&' || c == '(' || c == ')' ||
+                    c == '^' || c == ';' || c == ',' || c == '=' || c == '\'')
+                {
+                    needsQuotes = true;
+                    break;
+                }
+            }
+            return needsQuotes ? "\"" + path + "\"" : path;
+        }
+
+        /// <summary>Best-effort C:\foo\bar -> /mnt/c/foo/bar translation for WSL sessions.</summary>
+        private static string ToWslPath(string path)
+        {
+            if (path.Length >= 2 && path[1] == ':' && char.IsLetter(path[0]))
+            {
+                return "/mnt/" + char.ToLowerInvariant(path[0]) + path.Substring(2).Replace('\\', '/');
+            }
+            return path.Replace('\\', '/');
         }
 
         private void HandleResize(int cols, int rows)
@@ -600,6 +696,8 @@ namespace TerminalEmulator.Control
 
                 if (_webView != null)
                 {
+                    _webView.DragEnter -= OnTerminalDragEnter;
+                    _webView.DragDrop -= OnTerminalDragDrop;
                     _webView.Dispose();
                     _webView = null;
                 }

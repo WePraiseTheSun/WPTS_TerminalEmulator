@@ -150,3 +150,42 @@ html, body {
   opacity: 0.55;
   border-top: 1px solid var(--border);
 }
+
+/* --- Context menu ------------------------------------------------------- */
+
+#context-menu {
+  display: none;
+  position: fixed;
+  z-index: 60;
+  min-width: 160px;
+  padding: 4px 0;
+  background: var(--chrome-bg, #252526);
+  border: 1px solid var(--chrome-border, #3c3c3c);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  font: 12px "Segoe UI", sans-serif;
+  color: var(--chrome-fg, #cccccc);
+  user-select: none;
+}
+
+#context-menu .item {
+  padding: 6px 14px;
+  cursor: default;
+  white-space: nowrap;
+}
+
+#context-menu .item:hover {
+  background: var(--accent, #0e639c);
+  color: #ffffff;
+}
+
+#context-menu .item.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+#context-menu .separator {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--chrome-border, #3c3c3c);
+}

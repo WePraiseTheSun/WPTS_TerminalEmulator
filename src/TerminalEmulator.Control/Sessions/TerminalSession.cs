@@ -347,6 +347,19 @@ namespace TerminalEmulator.Control.Sessions
             if (value < 0) Interlocked.Exchange(ref _outstandingChars, 0);
         }
 
+        /// <summary>
+        /// Drops the scrollback replay cache. Called when the renderer clears
+        /// its screen (Ctrl+L) so a later detach/attach doesn't resurrect the
+        /// content the user explicitly cleared.
+        /// </summary>
+        public void ClearReplay()
+        {
+            lock (_replaySync)
+            {
+                _replay.Clear();
+            }
+        }
+
         public void Dispose()
         {
             lock (_lifecycleSync)

@@ -28,5 +28,6 @@ namespace TerminalEmulator.Control.Bridge
         public const string SwitchSession = "switchSession";   // activate a shell tab
         public const string RequestCompletion = "requestCompletion"; // path completion query
         public const string SetTheme = "setTheme";             // switch to a registered theme by name
+        public const string ClearScreen = "clearScreen";       // Ctrl+L: renderer cleared; drop replay cache
     }
 }
