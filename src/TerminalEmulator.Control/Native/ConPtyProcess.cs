@@ -49,6 +49,22 @@ namespace TerminalEmulator.Control.Native
             var startupInfo = new NativeApi.STARTUPINFOEX();
             startupInfo.StartupInfo.cb = Marshal.SizeOf(typeof(NativeApi.STARTUPINFOEX));
 
+            // Critical: when the parent's standard handles are redirected
+            // (e.g., launched under the Visual Studio debugger, which pipes
+            // program output into its Debug window), CreateProcess duplicates
+            // those redirected handles into a console-subsystem child even
+            // with bInheritHandles = FALSE — a legacy compatibility behavior.
+            // The child then talks to the debugger's pipes instead of the
+            // pseudoconsole: output appears in VS's Output window and the
+            // terminal receives nothing. Setting STARTF_USESTDHANDLES with
+            // all three handles left NULL suppresses that duplication so the
+            // child binds exclusively to the ConPTY.
+            // Ref: microsoft/terminal discussion #15814 / issue #11276.
+            startupInfo.StartupInfo.dwFlags = NativeApi.STARTF_USESTDHANDLES;
+            startupInfo.StartupInfo.hStdInput = IntPtr.Zero;
+            startupInfo.StartupInfo.hStdOutput = IntPtr.Zero;
+            startupInfo.StartupInfo.hStdError = IntPtr.Zero;
+
             // Size probe, then allocate and initialize the attribute list.
             var listSize = IntPtr.Zero;
             NativeApi.InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref listSize);
@@ -126,7 +142,7 @@ namespace TerminalEmulator.Control.Native
                     }
                 }
 
-             //   cancellationToken.ThrowIfCancellationRequested();
+            //    cancellationToken.ThrowIfCancellationRequested();
 
                 uint exitCode;
                 return NativeApi.GetExitCodeProcess(handle, out exitCode) ? (int)exitCode : -1;

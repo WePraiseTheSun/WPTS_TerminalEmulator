@@ -14,6 +14,7 @@ namespace TerminalEmulator.Control.Native
     {
         internal const uint EXTENDED_STARTUPINFO_PRESENT = 0x00080000;
         internal const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
+        internal const int STARTF_USESTDHANDLES = 0x00000100;
         internal static readonly IntPtr PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE = (IntPtr)0x00020016;
 
         internal const uint INFINITE = 0xFFFFFFFF;

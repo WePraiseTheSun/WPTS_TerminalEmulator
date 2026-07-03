@@ -349,10 +349,14 @@
         break;
 
       case "data":
-        if (message.sessionId !== state.activeSessionId) return; // stale stream
+        // Empty sessionId = host-level notice (e.g., shell failed to start):
+        // always render it. Otherwise drop stale streams from other sessions.
+        if (message.sessionId && message.sessionId !== state.activeSessionId) return;
         term.write(message.payload, function () {
           // Backpressure credit: tell the host how much has been rendered.
-          send({ type: "ack", sessionId: message.sessionId, bytes: message.payload.length });
+          if (message.sessionId) {
+            send({ type: "ack", sessionId: message.sessionId, bytes: message.payload.length });
+          }
         });
         break;
 

@@ -1,10 +1,13 @@
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.8.34309.116
+# Visual Studio Version 18
+VisualStudioVersion = 18.7.11925.98 stable
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TerminalEmulator.Control", "src\TerminalEmulator.Control\TerminalEmulator.Control.csproj", "{5B3C6A61-1F2E-4D7A-9C58-2E9A8D4F1A01}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TerminalEmulator.Demo", "src\TerminalEmulator.Demo\TerminalEmulator.Demo.csproj", "{7D4E8B92-3A5C-4F1B-8E67-4C2B9E6D2B02}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TerminalEmulatorNet48.Demo", "src\TerminalEmulatorNet48.Demo\TerminalEmulatorNet48.Demo.csproj", "{4D882A8F-5D14-46E0-BE2B-92D2EAE08415}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -20,6 +23,10 @@ Global
 		{7D4E8B92-3A5C-4F1B-8E67-4C2B9E6D2B02}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7D4E8B92-3A5C-4F1B-8E67-4C2B9E6D2B02}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7D4E8B92-3A5C-4F1B-8E67-4C2B9E6D2B02}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4D882A8F-5D14-46E0-BE2B-92D2EAE08415}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4D882A8F-5D14-46E0-BE2B-92D2EAE08415}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4D882A8F-5D14-46E0-BE2B-92D2EAE08415}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4D882A8F-5D14-46E0-BE2B-92D2EAE08415}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
