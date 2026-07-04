@@ -53,19 +53,28 @@ namespace TerminalEmulator.Control.Sessions
         }
 
         /// <summary>
-        /// Best-effort live working directory of the shell, read from the
-        /// child process (accurate for cmd; PowerShell reports its launch
-        /// directory because it tracks location without changing the process
-        /// CWD). Falls back to the profile's start directory.
+        /// Live working directory of the shell. Sources, in order: the
+        /// shell-integration OSC 9;9 report (exact for the PowerShell preset
+        /// and any shell configured to emit it), the child process's Win32
+        /// CWD read from its PEB (exact for cmd), then the profile's start
+        /// directory.
         /// </summary>
         public string GetWorkingDirectory()
         {
+            // 1. Shell-integration report (OSC 9;9) — exact for PowerShell
+            //    (and any shell configured to emit it, including WSL).
+            string reported = _cwdTracker.CurrentDirectory;
+            if (!string.IsNullOrEmpty(reported)) return reported;
+
+            // 2. The child process's Win32 CWD (exact for cmd).
             var process = _process;
             if (process != null && !process.HasExited)
             {
                 string cwd = ProcessWorkingDirectory.TryGet(process.ProcessId);
                 if (!string.IsNullOrEmpty(cwd)) return cwd;
             }
+
+            // 3. Where the session started.
             return Profile.StartDirectory;
         }
 
@@ -76,6 +85,7 @@ namespace TerminalEmulator.Control.Sessions
         public event Action<TerminalSession, int, bool> Exited;
 
         private readonly OutputAggregator _aggregator;
+        private readonly WorkingDirectoryTracker _cwdTracker = new WorkingDirectoryTracker();
         private readonly StringBuilder _replay = new StringBuilder();
         private readonly object _replaySync = new object();
         private readonly object _writeSync = new object();
@@ -123,6 +133,7 @@ namespace TerminalEmulator.Control.Sessions
             _rows = rows > 0 ? rows : 30;
             _cts = new CancellationTokenSource();
             _aggregator.Reset();
+            _cwdTracker.Reset();
 
             PseudoConsolePipe inputPipe = null;
             PseudoConsolePipe outputPipe = null;
@@ -321,6 +332,11 @@ namespace TerminalEmulator.Control.Sessions
 
         private void HandleDecodedOutput(string payload)
         {
+            // Shell integration: shells that emit OSC 9;9 (see the PowerShell
+            // preset) report their CWD here; this is the only reliable source
+            // for shells that do not sync the Win32 process working directory.
+            _cwdTracker.Scan(payload);
+
             if (_disposed || string.IsNullOrEmpty(payload)) return;
 
             lock (_replaySync)

@@ -142,7 +142,7 @@ namespace TerminalEmulator.Control.Native
                     }
                 }
 
-             //   cancellationToken.ThrowIfCancellationRequested();
+                //cancellationToken.ThrowIfCancellationRequested();
 
                 uint exitCode;
                 return NativeApi.GetExitCodeProcess(handle, out exitCode) ? (int)exitCode : -1;

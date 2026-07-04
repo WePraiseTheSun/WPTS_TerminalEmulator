@@ -43,12 +43,32 @@ namespace TerminalEmulator.Control.Sessions
 
         public static ShellProfile PowerShell()
         {
+            // PowerShell tracks its location internally and never updates the
+            // Win32 process working directory, so reading the child's CWD from
+            // the PEB always returns the launch directory. The fix is shell
+            // integration (same as Windows Terminal): redefine `prompt` to
+            // emit an OSC 9;9 working-directory report on every prompt, which
+            // WorkingDirectoryTracker picks out of the output stream. The
+            // injected function reproduces the default "PS C:\path> " prompt
+            // (including nesting), and -EncodedCommand sidesteps command-line
+            // quoting entirely. The user's profile still loads first, so this
+            // redefinition wins even when a profile defines its own prompt.
+            const string integration =
+                "function prompt {" +
+                " $l = $executionContext.SessionState.Path.CurrentLocation;" +
+                " $p = \"PS $l$('>' * ($nestedPromptLevel + 1)) \";" +
+                " \"$([char]27)]9;9;`\"$l`\"$([char]27)\\$p\"" +
+                " }";
+
+            string encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(integration));
+
             return new ShellProfile
             {
                 Name = "PowerShell",
                 Kind = "powershell",
                 CommandLine = Environment.ExpandEnvironmentVariables(
-                    @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo")
+                    @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe") +
+                    " -NoLogo -NoExit -EncodedCommand " + encoded
             };
         }
 
